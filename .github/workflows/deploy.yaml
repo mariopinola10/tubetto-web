@@ -1,0 +1,47 @@
+name: Pubblica Tubetto Web
+
+on:
+  push:
+    paths:
+      - 'tubetto-web-*.zip'
+      - '.github/workflows/deploy.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Estrai lo zip con la versione più alta
+        run: |
+          set -e
+          Z=$(ls tubetto-web-*.zip 2>/dev/null | sort -V | tail -1)
+          if [ -z "$Z" ]; then echo "::error::Nessun tubetto-web-X.Y.Z.zip nel repo"; exit 1; fi
+          echo "Pubblico $Z"
+          rm -rf _x site && mkdir _x site
+          unzip -q "$Z" -d _x
+          SRC=$(find _x -type f -name index.html -path '*/site/*' | head -1 | xargs dirname)
+          cp -r "$SRC"/. site/
+          echo "## Pubblicato $Z" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
